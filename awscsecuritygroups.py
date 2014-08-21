@@ -104,6 +104,7 @@ class SecurityGroups():
     def _getTemplateElements(self):
         for secg in self.data.keys():
             data = self.data.get(secg)
+            print secg
             data["Tags"] = [ ec2.Tag('Name', secg) ] + self.DefaultsTags
             yield ec2.SecurityGroup( secg.strip() , **data )
 
@@ -165,7 +166,7 @@ def main():
     logger.info('Executing %s'%args)
     logger.info('Creating cloudformation template')
 
-    sgp = SecurityGroups("%s::SecurityGroups"%args.environment, "%s::SecurityGroups"%args.environment)
+    sgp = SecurityGroups("%s::SecurityGroups"%args.environment, "Created using AWSCloudFormationSecurityGroups")
     sgp.read(args.securitygroups_file)
     template = sgp.create()
     f = open(os.path.join("tmp","cloudformation"),'w')

@@ -1,4 +1,4 @@
-## AWScSecurityGroups stands for *AWS Cloud SecurityGroups*
+## AWScSecurityGroups stands for *AWS CloudFormation SecurityGroups*
 
 It is a python script that helps you to create and manage security groups on amazon in an automated way.
 
@@ -21,4 +21,19 @@ python awscsecuritygroups.py -h
 ```
 
 ### Notes
-Please check the [example.conf](example.conf) file
+You can describe your Security Groups on the same way:
+```
+[ sg1 ]
+vpcid = <vpcid>
+description = description sg1
+inbound = 
+	tcp 22 10.0.1.1/28
+	ALL ALL 10.0.1.1/28
+	tcp 22 10.0.1.2/28
+
+[ sg2 ]
+vpcid = <vpcid>
+description = description sg2
+inbound = tcp 22 10.0.1.1/28
+outbound = tcp 22 10.0.1.1/28
+```
