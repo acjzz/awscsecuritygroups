@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import ansible.runner
 import ConfigParser
-from troposphere import Template
+from troposphere import Template, Ref
 import troposphere.ec2 as ec2
 import re
 import time
@@ -43,7 +43,7 @@ class SecurityGroups():
     @staticmethod
     def parseRule(rule):
         rproto = '([a-z]+)'
-        rport = '([0-9]+)'
+        rport = '(([0-9]+)|([al]+))'
         rcidr = '([0-9]+.[0-9]+.[0-9]+.[0-9]+/[0-9]+)'
         rspace = '\s+'
         rsecgroup = '([a-z\-_]+)'
@@ -54,25 +54,33 @@ class SecurityGroups():
                        rproto + rspace + rport + rspace + rsecgroup,
                        rproto + rspace + rport + '-' + rport + rspace + rsecgroup,
                        rproto + rspace + rport + rspace + rcidr,
-                       rproto + rspace + rport + '-' + rport + rspace + rcidr
+                       rproto + rspace + rport + '-' + rport + rspace + rcidr,
                     ]:
 
             matches = re.compile(regex, re.IGNORECASE).findall(rule)
 
             if len(matches):
+                matches[0] = filter(None, matches[0])
                 result = {}
                 result['IpProtocol'] = matches[0][0]
                 result['FromPort'] = matches[0][1]
                 result['ToPort'] = matches[0][-2]
 
+                if result.get('IpProtocol').lower() == "all":
+                     result['IpProtocol'] = "-1"
+
+                if result.get('FromPort').lower() == "all":
+                    result['FromPort'] = "0"
+                    result['ToPort'] = "65535"
+
                 if re.compile(rcidr, re.IGNORECASE ).findall(matches[0][-1]):
                     result['CidrIp'] = matches[0][-1]
                 elif re.compile(rsecgroupid, re.IGNORECASE ).findall(matches[0][-1]):                    
-                    result['SourceSecurityGroupId'] = matches[0][-1]
+                    result['SourceSecurityGroupId'] = Ref(matches[0][-1])
                 else:
-                    result['SourceSecurityGroupName'] = matches[0][-1]
+                    result['SourceSecurityGroupName'] = Ref(matches[0][-1])
 
-                return  ec2.SecurityGroupRule('',**result)
+                return ec2.SecurityGroupRule('',**result) 
 
     def __init__(self, environment, stack_description):
         self.data = {}
@@ -88,17 +96,15 @@ class SecurityGroups():
             self.data.get(section)['VpcId'] = self.config.get(section,'vpcid')
             self.data.get(section)['GroupDescription'] = self.config.get(section,'description')
             for x,y in [('inbound', "SecurityGroupIngress"), ('outbound',"SecurityGroupEgress")]: 
-                try:
+                if self.config.has_option(section, x):
                     for rule in self.config.get(section, x ).split('\n'):
                         if rule:
                             self.data.get(section).get( y ).append(self.parseRule(rule))
-                except:
-                    pass
 
     def _getTemplateElements(self):
         for secg in self.data.keys():
             data = self.data.get(secg)
-            data["Tags"] = self.DefaultsTags
+            data["Tags"] = [ ec2.Tag('Name', secg) ] + self.DefaultsTags
             yield ec2.SecurityGroup( secg.strip() , **data )
 
     def create(self):
